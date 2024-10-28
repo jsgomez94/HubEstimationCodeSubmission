@@ -1,11 +1,18 @@
 
+/figures_4/figure_s1/req_lib/
+
+
+
+
+
 /simulations_4/req_lib/
+
+/simulations_4/000_HglHwglPretraining/pretrainings1/
 
 /simulations_4/100_SimOnlyIpchdMethods/experiments1/data/
 /simulations_4/100_SimOnlyIpchdMethods/experiments1/logs/
 /simulations_4/100_SimOnlyIpchdMethods/outputs1/data/
 /simulations_4/100_SimOnlyIpchdMethods/outputs1/logs/
-
 
 /simulations_4/200_SimWithHglMethod/experiments1/data/
 /simulations_4/200_SimWithHglMethod/experiments1/logs/
