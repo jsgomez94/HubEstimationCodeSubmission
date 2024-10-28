@@ -6,13 +6,12 @@
 /simulations_4/100_SimOnlyIpchdMethods/outputs1/data/
 /simulations_4/100_SimOnlyIpchdMethods/outputs1/logs/
 
-/simulations_4/200_SimWithHglMethod/pretrainings1/
+
 /simulations_4/200_SimWithHglMethod/experiments1/data/
 /simulations_4/200_SimWithHglMethod/experiments1/logs/
 /simulations_4/200_SimWithHglMethod/outputs1/data/
 /simulations_4/200_SimWithHglMethod/outputs1/logs/
 
-/simulations_4/300_SimExploringHwglSparsity/pretrainings1/
 /simulations_4/300_SimExploringHwglSparsity/experiments1/data/
 /simulations_4/300_SimExploringHwglSparsity/experiments1/logs/
 /simulations_4/300_SimExploringHwglSparsity/experiments1/bic_data/
