@@ -1,21 +1,3 @@
-#################################################
-#################################################
-#################################################
-##
-## In the following document, we introduce the
-## functions that take a covariance matrix 
-## estimate and turn them into a hub estimation.
-## We measure:
-##  1) TP rate.
-##  2) FP rate.
-##  3) AUC
-##
-#################################################
-#################################################
-
-
-
-
 
 #################################################
 #################################################
@@ -23,11 +5,27 @@
 #################################################
 ## Methods for hub detection:
 
-######################
-######################
-## Function that summarizes the accuracy of
-## strength-hub estimation, given an 
-## estimated PM and the set of true hubs.
+
+#################################################
+#################################################
+## alphahubs: 
+##    Function that summarizes the accuracy of
+##    strength-hub estimation, given an 
+##    estimated PM and the set of true hubs.
+##    Hubs are estimated with L2 norm.
+##
+##  INPUTS
+##    Theta     : precision matrix estimator.
+##    trueHubs  : set of true hubs.
+##    q         : total dimension.
+##    nhubs     : number of true hubs.
+##
+##  OUTPUT
+##    TP        : true positive rate of hub recovery.
+##    FP        : false positive rate of hub recovery.
+##    AUC       : area under the curve summary for the
+##                 l2 norms. 
+##
 alphahubs = function(Theta, 
                      trueHubs, 
                      q,
@@ -55,8 +53,19 @@ alphahubs = function(Theta,
                  AUC = .auc)
   return(.OUTPUT)
 }
-######################
-## Computes the alpha-values of a given matrix.
+
+#################################################
+#################################################
+## .alphavals: 
+##    Auxiliary function.
+##    Computes the alpha-values of a given matrix.
+##
+##  INPUTS
+##    Theta     : precision matrix estimator.
+##
+##  OUTPUT
+##    .alpha    : L2^2 columnwise norms.
+##
 .alphavals = function(Theta){
   .alpha = apply(Theta^2, MARGIN = 2, sum)
   return(.alpha)
@@ -65,11 +74,26 @@ alphahubs = function(Theta,
 
 
 
-######################
-######################
-## Function that summarizes the accuracy of
-## degree-hub estimation, given an 
-## estimated PM and the set of true hubs.
+#################################################
+#################################################
+## degreehubs: 
+##    Function that summarizes the accuracy of
+##    degree-hub estimation, given an 
+##    estimated PM and the set of true hubs.
+##    Hubs are estimated with L0 norm.
+##
+##  INPUTS
+##    Theta     : precision matrix estimator.
+##    trueHubs  : set of true hubs.
+##    q         : total dimension.
+##    nhubs     : number of true hubs.
+##
+##  OUTPUT
+##    TP        : true positive rate of hub recovery.
+##    FP        : false positive rate of hub recovery.
+##    AUC       : area under the curve summary for the
+##                 l2 norms. 
+##
 degreehubs = function(Theta, 
                       trueHubs, 
                       q,
@@ -102,12 +126,28 @@ degreehubs = function(Theta,
 
 
 
-
-######################
-######################
-## Function that summarizes the accuracy of
-## ipc-hd estimation, given an 
-## estimated PM and the set of true hubs.
+#################################################
+#################################################
+## ipchdhubs: 
+##    Function that summarizes the accuracy of
+##    ipc-hd estimation, given an 
+##    estimated PM and the set of true hubs.
+##
+##  INPUTS
+##    Theta     : precision matrix estimator.
+##    trueHubs  : set of true hubs.
+##    q         : total dimension.
+##    n         : sample size.
+##    r         : number of true hubs.
+##    method    : measure used for variable screening.
+##                  Can use "maxcor", "l1" or "l2".
+##
+##  OUTPUT
+##    TP        : true positive rate of hub recovery.
+##    FP        : false positive rate of hub recovery.
+##    AUC       : area under the curve summary for the
+##                 l2 norms. 
+##
 ipchdhubs = function(empcov, 
                      trueHubs, 
                      q, n, r, 
@@ -149,8 +189,34 @@ ipchdhubs = function(empcov,
                  AUC = .auc)
   return(.OUTPUT)
 }
-######################
-## Reduce dimension by choosing larger max-corr.
+
+#################################################
+#################################################
+## .reduce.dim: 
+##    Auxiliary function.
+##    Performs dimension reduction for the covariance
+##    matrix.
+
+##  INPUTS
+##    empcov   : covariance matrix estimator.
+##    q        : total dimension.
+##    n        : sample size.
+##    r        : number of true hubs in data.
+##    method   : measure used for variable screening.
+##                  Can use "maxcor", "l1" or "l2".
+##
+##  OUTPUT
+##    strength  : connectivity strength measurement used 
+##                  for screening.
+##    hubest    : variables selected by the screening method.
+##    empcov    : pxp reduced covariance post variable screening.
+##    vars      : variables selected by the screening method.
+##    position  : q-sized vector with 0s for variables not selected,
+##                  and the position of the variable in the reduced
+##                  matrix post screening.
+##    p         : number of variables post dimension reduction.
+##    ndetected : number of hubs selected by the screening method.
+##
 .reduce.dim = function (empcov, q, n, r, method = "maxcor") {
   .maxcor = NULL
   if (method == "maxcor") {
@@ -198,9 +264,20 @@ ipchdhubs = function(empcov,
                   ndetected = .detected)
   return(.OUTCOME)
 }
-######################
-## Computes the leading consecutive eigenvalue ratios 
-## up to a cutoff.
+#################################################
+#################################################
+## .eigengaps: 
+##    Computes the leading consecutive eigenvalue ratios 
+##    up to a cutoff.
+
+##  INPUTS
+##    empcov   : covariance matrix estimator.
+##    cutoff   : number of eigenvalues to include in calculations
+##
+##  OUTPUT
+##    .gaps    : cuttoff-length vector with 
+##                ratios between consecutive eigenvalues
+##
 .eigengaps = function(empcov, cutoff = NULL){
   .p = dim(empcov)[1]
   if(is.null(cutoff))
@@ -210,9 +287,21 @@ ipchdhubs = function(empcov,
   .gaps = .vals[1:cutoff]/.vals[2:(cutoff + 1)]
   return(.gaps)
 }
-######################
-## Computes the largest eigenvalue gap within a 
-## given cutoff.
+
+#################################################
+#################################################
+## .shat: 
+##    Computes the largest eigenvalue gap within a 
+##    given cutoff.
+##
+##  INPUTS
+##    empcov   : covariance matrix estimator.
+##    cutoff   : number of eigenvalues to include in calculations
+##
+##  OUTPUT
+##    .shat    : index of the largest ratio between consecutive
+##                eigenvalues
+##
 .shat = function(empcov, cutoff = NULL){
   .p = dim(empcov)[1]
   if(is.null(cutoff))
@@ -231,9 +320,23 @@ ipchdhubs = function(empcov,
   
   return(.shat)
 }
-######################
-## Given the eigenvalue gap found in the previous
-## function, it finds the omega-weights.
+#################################################
+#################################################
+## .weights: 
+##    Given the eigenvalue gap found in the previous
+##    function, it calculates the influence measures.
+##
+##  INPUTS
+##    .red     : list object. Output of the function reduce.dim().
+##    .shat    : index of the largest ratio between consecutive
+##                eigenvalues, calculated by function .shat().
+##    q        : total dimension.
+##
+##  OUTPUT
+##    .output.weights : Numeric vector of length p. Influence measures 
+##                        associated with the reduced covariance matrix 
+##                        obtained by reduce.dim().
+##
 .weights = function (.red, .shat, q) {
   .p = .red$p
   
