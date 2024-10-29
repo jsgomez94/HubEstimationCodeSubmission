@@ -12,7 +12,7 @@ cbPalette <- c("#999999", "#E69F00", "#56B4E9",
 
 ##############################################
 ##############################################
-## Let us
+## Generating Precision Matrix:
 p=100
 r = 5
 set.seed(20)
@@ -26,60 +26,13 @@ pm = r.sparse.pdhubmat(
 
 ic = .PMtoIC(pm)
 eig.ic = eigen(ic)
-plot(
-  eig.ic$values, 
-  main = "Eigenvalues of Inverse-Correlation Matrix")
- dev.off()
-
 
 
 ##############################################
 ##############################################
-par(mfrow = c(1,1),
-    oma = c(0,0,0,0))
+# PLOT 1: EIGENVALUE RATIOS PLOT
 
-eigenvals = matrix(0, ncol = 90, nrow = p)
-for(.i in 1:90){
-  .n = p + 10*.i
-  .X = rmvnorm(n = .n, sigma = solve(pm))
-  .RHat = cor(.X)
-  
-  .icHat = solve(.RHat)
-  eig.icHat = eigen(.icHat)
-  
-  eigenvals[, .i] = eig.icHat$values
-  print(.i)
-}
-
-plot(x= p + 10*(1:100), y= 5*eig.ic$values ,col = "white",
-     bty = "L",
-     xlim = c(100,1150),ylim = c(0,20),
-     main = "Eigenvalues of Sample IC", cex.main = 2,
-     xlab = "Sample size", ylab = "Eigenvalues")
-for(.val in 1:p){
-  if(.val < r){
-    lines(x = p + 10*(1:90), y = eigenvals[.val,], col = cbPalette[2])
-  } else if (.val == r) {
-    lines(x = p + 10*(1:90), y = eigenvals[.val,], col = cbPalette[7])
-  }else {
-    lines(x = p + 10*(1:90), y = eigenvals[.val,], col = cbPalette[1])
-  }
-}
-abline(v = 1025)
-points(x = rep(1050, p), y = eig.ic$values, pch = 19, cex = 1,
-       col = rep(c(cbPalette[2],cbPalette[7],cbPalette[1]),c(r-1, 1, p-r)))
-
-
-text(labels = "Pop.\nvalues", x = 1025, y= 19.0, pos = 4, cex = 1.2)
-text(labels = "Emp.\nvalues", x = 1020, y= 19.0, pos = 2, cex = 1.2)
-
-legend(x ="topleft",
-       legend = c("Top eigenvalues", "cut point eigenvalue", "Bottom eigenvalue"),
-       col = cbPalette[c(2,7,1)], lty = 19, cex = 1)
-dev.off()
-
-##############################################
-##############################################
+## Calculating consecutive eigenvalue ratios:
 data = NULL
 half = floor(p/2)
 gaps = eig.ic$values[1:half]/eig.ic$values[2:(half + 1)]
@@ -104,6 +57,7 @@ for(.i in 1:90){
   print(.i)
 }
 
+## Generating plot:
 file_name <- "005_figS2.pdf"
 pdf(file_name, width = 9.5, height = 4.5)
 par(mfrow = c(1,3),
@@ -142,10 +96,9 @@ legend(x = "topleft",
 
 ##############################################
 ##############################################
-# INFLUENCE MEASURES WITH TRUE GAP S = 5
-##############################################
-##############################################
+# PLOT 2: INFLUENCE MEASURES WITH TRUE GAP S = 5
 
+## Influence measures with r = 5 eigenvectors.
 pop.weights = apply(eig.ic$vectors[, 1:r]^2,
                     MARGIN = 1,
                     sum) 
@@ -166,6 +119,7 @@ for(.i in 1:90){
   print(.i)
 }
 
+## Generating plot:
 plot(x= p + 10*(1:100), y= 1:100,col = "white",
      bty = "L", xlim = c(100,1150),ylim = c(0,1),
      main = "Weight", cex.main = 2,
@@ -198,12 +152,10 @@ mtext(text = "IPC-HD method vs. sample size",
 
 ##############################################
 ##############################################
-# INFLUENCE MEASURES WITH OVERESTIMATED
+# PLOT 3: INFLUENCE MEASURES WITH OVERESTIMATED
 # GAP S = 10
-##############################################
-##############################################
 
-
+## Influence measures with 2r = 10 eigenvectors.
 pop.weights = apply(eig.ic$vectors[, 1:(2*r)]^2,
                     MARGIN = 1,
                     sum) 
@@ -224,6 +176,7 @@ for(.i in 1:90){
   print(.i)
 }
 
+## Generating plot:
 plot(x= p + 10*(1:100), y= 1:100,col = "white",
      bty = "L", xlim = c(100,1150),ylim = c(0,1),
      main = "Over-estimated weight", cex.main = 2,
