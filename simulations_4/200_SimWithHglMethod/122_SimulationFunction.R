@@ -75,7 +75,7 @@ FullSimulation <- function(args, index) {
   ## Load pre-training to environment.
   #####################################################
   
-  pretraining_vals <- load_pretraining(args, index)
+  pretraining_vals <- load_pretraining(args, 2)#index)
   list2env(pretraining_vals, globalenv())
 
   #####################################################

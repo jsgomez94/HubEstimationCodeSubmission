@@ -8,10 +8,8 @@
 /simulations_4/req_lib/
 
 /simulations_4/000_HglHwglPretraining/pretrainings1/
-
-/simulations_4/000_HglHwglPretraining/pretrainings2/
-/simulations_4/200_SimWithHglMethod/pretrainings2/
-/simulations_4/300_SimExploringHwglSparsity/pretrainings2/
+/simulations_4/200_SimWithHglMethod/pretrainings1/
+/simulations_4/300_SimExploringHwglSparsity/pretrainings1/
 
 
 /simulations_4/100_SimOnlyIpchdMethods/experiments1/data/

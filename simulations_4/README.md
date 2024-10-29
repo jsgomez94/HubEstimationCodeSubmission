@@ -18,15 +18,32 @@ This folder contains the code corresponding to the numerical simulations results
 
 The simulations are run in a linux cluster with SLURM scheduling system. 
 
-0. **Install Requirements:** Install all packages required for our simulations by running
+
+0. **Clone Repository:** First, clone the github repository <em>HubEstimationCodeSubmission</em> to a linux cluster with SLURM scheduling system.
+
+1. **Install Requirements:** Install all packages required for our simulations by running
 
     - <code>Rscript 001_requirements.R</code>
 
     Ensure that all packages are properly installed by reviewing the directory <code>req_lib/</code>.
 
-1. **Copy Directory:** First, clone the github repository <em>HubEstimationCodeSubmission</em> to a linux cluster with SLURM scheduling system.
+2. **Debugging Pretraining of HGL and HWGL:** the methods HGL and HWGL are designed specially for hub recovery, but require a careful fine-tuning of their tuning parameters, more demanding than the GLASSO method. To obtain these pre-training parameters, you must first run the pretraining scripts. 
 
-2. **Debugging:** In the linux cluster terminal, and enter the directory  <code>./simulations_4/</code>. To ensure that things run smoothly, run the commands,
+    In the linux cluster terminal, enter the directory <code>./simulations_4/</code>. To ensure that things run smoothly, run the command,
+
+    - <code>sbatch 000_HglHwglPretraining/110_ClusterPassPretraining0.sh</code>
+
+    This generates the pretraining of the HGL and HWGL for a toy example of index 0. Verify that directories <code>/pretrainings1/</code> are created inside of the folders <code>000_HglHwglPretraining/</code>, <code>200_SimWithHglMethod/</code>, and <code>300_SimExploringHwglSparsity/</code>. In each of the  <code>/pretrainings1/</code> folders, you should find the directory <code>data/</code> containing the pretuning parameters in RData format, and <code>logs/</code> with the command-line logs helping with debugging.
+
+3. **Pretraining the HGL and HWGL:** To pre-train all simulation scenarios considered, run the following commands:
+
+    - <code>sbatch 000_HglHwglPretraining/111_ClusterPassPretraining100.sh</code>
+    - <code>sbatch 000_HglHwglPretraining/112_ClusterPassPretraining200.sh</code>
+    - <code>sbatch 000_HglHwglPretraining/113_ClusterPassPretraining500.sh</code>
+
+    This should save the pre-trained tuning parameters in the <code>/pretrainings1/</code> folders of each of the directories <code>000_HglHwglPretraining/</code>, <code>200_SimWithHglMethod/</code>, and <code>300_SimExploringHwglSparsity/</code>. Check the log files in <code>/pretrainings1/logs/</code> for any additional debugging needed.
+
+4. **Debugging Systematic Simulations:** Once pretraining is completed, in the linux cluster terminal, and enter the directory  <code>./simulations_4/</code>. To ensure that things run smoothly, run the commands,
 
     - <code>sbatch 100_SimOnlyIpchdMethods/130_ClusterPassExperiment0.sh</code>
     - <code>sbatch 200_SimWithHglMethod/130_ClusterPassExperiment0.sh</code>
