@@ -11,7 +11,7 @@ FullSimulation <- function(args) {
   
   #####################################################
   #####################################################
-  
+  ## Generating precision matrix:
   .pm <- r.sparse.pdhubmat(
     p = args$p, T0 = args$T0, r = args$r,
     ph = args$ph, pnh = args$pnh, pneff = args$pneff,

@@ -282,7 +282,7 @@
 ##    neffmin : Used when type = "unif". Minimum absolute 
 ##                value of entries outside of the 
 ##                T0xT0 submatrix 
-##    neffmin : Used when type = "unif". Minimum absolute 
+##    neffmax : Used when type = "unif". Maximum absolute 
 ##                value of entries outside of the 
 ##                T0xT0 submatrix 
 ##    hsd     : Used when type = "gaussian". Standard

@@ -28,7 +28,7 @@ set.seed(20)
 print("#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 print("#-----------------------Reading inputs")
 
-#args <- CreateParameters(id_task)
+## Parameters of simulation:
 args <- list(
     p = 500, T0 = 500, r = 5,
     diagonal_shift = 5,
