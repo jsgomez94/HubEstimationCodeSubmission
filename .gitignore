@@ -1,4 +1,7 @@
 
+/realdata_4/100_ProcessingGeneData/001_Merged_FPKM-UQ.tsv
+/realdata_4/200_ProcessingClinicalData/im_for_readme/
+
 /figures_4/figure_s1/req_lib/
 /figures_4/figure_s2/req_lib/
 /figures_4/figure_s3/req_lib/
@@ -10,7 +13,6 @@
 /simulations_4/000_HglHwglPretraining/pretrainings1/
 /simulations_4/200_SimWithHglMethod/pretrainings1/
 /simulations_4/300_SimExploringHwglSparsity/pretrainings1/
-
 
 /simulations_4/100_SimOnlyIpchdMethods/experiments1/data/
 /simulations_4/100_SimOnlyIpchdMethods/experiments1/logs/
