@@ -89,6 +89,7 @@
 ##  OUTPUT
 ##    x  : trace of M.
 ##
+## ...
 Trace = function(M){
   return(sum(diag(M)))
 }
