@@ -8,11 +8,13 @@ This folder contains the code corresponding to the numerical simulations results
 
 - Files 001-051: these files contain all the required functions to perform simulations. They are divided into specific tasks, such as importing required packages (<code>001_requirements.R</code>), calculating our IPC-HD method (<code>013_Method_IPCHD.R</code>), calculating the GLASSO, HGL and HWGL (<code>022_Method_GLASSO.R</code>, <code>023_Method_HWGLASSO.R</code>, <code>024_Method_HGLASSO.R</code>) or generating the parameters for our simulations (<code>051_CreatingParameters.R</code>).
 
+- Files in directory 000: The HWGL and HGL methods require of pretraining to reduce the computational cost of their simulations. The files inside of the directory <code>000_HglHwglPretraining</code> contain the calls for such pretraining procedures.
+
 - Files in directories 100-400: These directories contain the calls for the numerical simulations. Each folder corresponds to one method. The files can be used to run (A) a small debugging example to ensure things run smoothly, (B) reduced experiments with a total of 20 simulation replicates, (C) full simulations with 100 simulation replicates.
 
 - Files/Directories 500: After reduced experiments are run, the file <code>511_Outcomes_DataAggregationExperiments.R</code> aggregates the experiments data, and saves it to the directory <code>500_AggregatedDataExperiments</code>. Then, files <code>512_Outcomes_ResultPlotsExperiments.R</code>, <code>513_Outcomes_TimeResultPlotsExperiments.R</code> and <code>514_Outcomes_DegreeByMethodPlotsExperiments.R</code> generate plots with the aggregated data. 
 
-- Files/Directories 600: After reduced experiments are run, the file <code>611_Outcomes_DataAggregationFull.R</code> aggregates the full simulation data, and saves it to the folder <code>600_AggregatedDataFull</code>. Then, files <code>612_Outcomes_ResultPlotsFull.R</code>, <code>613_Outcomes_TimeResultPlotsFull.R</code>, and <code>614_Outcomes_DegreeByMethodPlotsFull.R</code> generate plots with the aggregated data. 
+- Files/Directories 600: After full sized simulations with 100 replicates are run, the file <code>611_Outcomes_DataAggregationFull.R</code> aggregates the full simulation data, and saves it to the folder <code>600_AggregatedDataFull</code>. Then, files <code>612_Outcomes_ResultPlotsFull.R</code>, <code>613_Outcomes_TimeResultPlotsFull.R</code>, and <code>614_Outcomes_DegreeByMethodPlotsFull.R</code> generate plots with the aggregated data. 
 
 ## Simulation Rerunning Instructions:
 
