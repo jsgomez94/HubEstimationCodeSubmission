@@ -1,0 +1,296 @@
+---
+title: "Importing Clinical Data"
+author: "Jose Angel Sanchez Gomez"
+date: '2023-02-20'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+if(!require(plot.matrix)) {
+  install.packages("plot.matrix")
+  library("plot.matrix")
+}
+
+```
+
+In this markdown, our goal is to import the clinical data from our patients, visualize this clinical data, and eliminate variables with an excesive number of missing data.
+
+We start by reading all the data and doing a small exploration of the information available.
+
+
+First, we observe what are the dimensions, what variables are available and how many observations we have at hand.
+
+```{r pressure, echo=FALSE}
+
+###################
+###################
+clinical = read.csv("clinical.tsv", sep = "\t")
+
+dim(clinical)
+print(head(clinical[, 1:10]))
+
+```
+As we can see, missing data is marked with the symbol "'--". To decide which data to eliminate first, lets count how many observations are missing for each of the variables in our data. If a variable has missing data for almost all of the observations, we can eliminate it with no issue.
+
+```{r}
+
+###################
+###################
+sum(clinical == "'--")/ (dim(clinical)[1] * dim(clinical)[2])
+na_col_count = apply(clinical, MARGIN = 2, function(x) sum(x == "'--"))
+plot(
+  na_col_count, 
+  main = "Missing Observations Per Variable",
+  xlab = "Variable index",
+  ylab = "# Missing Observations")
+abline(h = dim(clinical)[1])
+
+```
+As we can observe, most of the variables in this dataset are completely missing or near-completely missing. Lets then start by eliminating all variables that have full missing data.
+
+```{r}
+
+###################
+###################
+max_count = max(na_col_count)
+
+keep_vars = which(na_col_count != max_count)
+print(paste0(
+  "The number of fully missing variables is: ",
+  dim(clinical)[2] - length(keep_vars)))
+
+clinical_reduced1 = clinical[, keep_vars]
+print(dim(clinical_reduced1))
+plot(na_col_count[keep_vars])
+
+```
+
+The next reduction corresponds to ensuring that we have records of each patient/observation only once. As we can observe, we have 495 different case-id's but a total of 990 rows. For this, let us first explore the repetitions on the case-id variable.
+
+
+```{r}
+
+###################
+###################
+cases_unique = unique(clinical_reduced1$case_id)
+
+cases_rep_count = rep(0, length(cases_unique))
+cases_rep_indexes = list()
+for (i in 1:length(cases_unique)) {
+  case = cases_unique[i]
+  cases_rep_count[i] = sum(clinical_reduced1$case_id == case)
+  cases_rep_indexes[[i]] = which(clinical_reduced1$case_id == case)
+}
+plot(
+  cases_rep_count,
+  main = "Number of Case-ID Repetitions",
+  xlab = "Case-ID Index",
+  ylab = "# of Repetitions")
+
+```
+
+From this plot, it seems like all cases are repeated exactly twice in the dataset. Let us now verify if the information for each of the case observations is exactly the same, or redundant in the dataset.
+
+In the following code, we go through each case-ID, and check if the two rows corresponding to this case-ID are identical, or if the two rows differ. If they differ, we count how many variables the two rows differ on.
+
+```{r}
+
+###################
+###################
+diff_count = rep(0, length(cases_unique))
+for(i in 1:length(cases_unique)) {
+  rep_indexes = cases_rep_indexes[[i]]
+  
+  diff_count[i] = sum(clinical_reduced1[rep_indexes[1], ] != clinical_reduced1[rep_indexes[2], ])
+}
+plot(
+  diff_count,
+  main = "Number of Variable Differences Per Case-ID",
+  ylab = "# differing variables per Case-ID",
+  xlab = " Case ID index",
+  ylim = c(0,4))
+abline(h = 0)
+
+```
+As we can observe from this result, no case-ID has two identical repeated rows. The majority of case-ID have only 1 variable that has differences across the two repeated rows. A smaller number of variables have 2 variables differing across the two repeated rows. More specifically, there are 419 cases where there is a difference just in a single variable across repeated cases, and 76 where there are 2 differences. 
+
+I now want to see which variables this corresponds with.
+
+```{r}
+
+###################
+###################
+diff_count_matrix = matrix(0, nrow = length(cases_unique), ncol = dim(clinical_reduced1)[2])
+
+for (i in 1:length(cases_unique)) {
+  rep_indexes = cases_rep_indexes[[i]]
+  
+  for (j in 1:dim(clinical_reduced1)[2]) {
+    diff_count_matrix[i, j] = sum(
+      clinical_reduced1[rep_indexes[1], j] != clinical_reduced1[rep_indexes[2], j])
+  }
+}
+
+diff_count_entries = which(diff_count_matrix != 0, arr.ind = TRUE)
+
+plot(
+  y = diff_count_entries[,1],
+  x = diff_count_entries[,2],
+  pch = 19, cex = 0.5,
+  col = "red",
+  xlim = c(0,(dim(clinical_reduced1)[2])),
+  ylim = c(0,(dim(clinical_reduced1)[1])),
+  main = "Location of Missing Variables",
+  xlab = "Row Index",
+  ylab = "Column Index")
+
+```
+As we can observe from this plot, only the variables 35 and 36 have missing entries. These two columns correspond to the variables "treatment_or_therapy" and "treatment_type" behave.
+
+The information of variable 36 and variable 35 is contradictory, since 36 indicates that all patients received both pharmaceutical and radiation treatment, while variable 35 indicates that some may have received treatment while others did not.
+
+Lets analyze in more details how the variables treatment_or_therapy and treatment_type behave.
+
+
+```{r}
+
+###################
+###################
+print(paste("Summary of variable:", colnames(clinical_reduced1)[35]))
+var1_exploration1 <- clinical_reduced1[, 35]
+var1_exploration1 <- as.factor(var1_exploration1)
+summary(var1_exploration1)
+
+print(paste("Summary of variable:", colnames(clinical_reduced1)[36]))
+var1_exploration2 <- clinical_reduced1[, 36]
+var1_exploration2 <- as.factor(var1_exploration2)
+summary(var1_exploration2)
+
+```
+As we can observe, the variable "treatment_type" has two values, "Pharmaceutical Therapy, NOS" and "Radiation Therapy, NOS". Furthermore, these values have exactly 495 repetitions. We know that each of our 495 case-IDs has 2 rows. From this, it seems like each case-ID has a row corresponding to radiation therapy information, and a second row with pharmaceutical therapy information.
+
+In the following chunk, lets confirm: do each case-id has exactly one row with pharmaceutical therapy information and a second row with radiation therapy information?
+
+The following code counts how many case-IDs have both a row of "pharmaceutical therapy" and a row with "radiation therapy" info.
+
+```{r} 
+
+###################
+###################
+count = 0
+options = c("Pharmaceutical Therapy, NOS", "Radiation Therapy, NOS") 
+
+for (i in 1:length(cases_unique)) {
+  rep_indexes = cases_rep_indexes[[i]]
+  
+  a = clinical_reduced1[rep_indexes[1], 36]
+  b = clinical_reduced1[rep_indexes[2], 36]
+  
+  count = count + ((options[1] %in% c(a,b)) & (options[2] %in% c(a,b)))
+  
+}
+print(count)
+
+```
+As we can observe, all case-IDs in our dataset have one row with radiation therapy information and one row with pharmaceutical therapy. This confirms that all case-id's have information on both. This helps clarify the properties of variable 36.
+
+Now, lets visualize the values of the variable 35 across the first 10 case-IDs.
+
+```{r}
+
+###################
+###################
+for (i in 1:10) {
+  rep_indexes = cases_rep_indexes[[i]]
+  
+  a = clinical_reduced1[rep_indexes[1], 35]
+  b = clinical_reduced1[rep_indexes[2], 35]
+  print(paste(clinical_reduced1$case_id[rep_indexes[1]], ":", a, "/", b))
+}
+
+```
+It seems to me like the variable 36 is used to index the type of therapy that the row discusses, and the variable 35 gives information of whether the patients received THAT treatment or not. I cannot be sure of this, because no further detail is provided in the variable detail page: https://docs.gdc.cancer.gov/Data_Dictionary/viewer/#?view=table-definition-view&id=treatment.
+
+```{r}
+
+###################
+###################
+table(clinical_reduced1[, 35:36])
+
+
+```
+
+From the obtained summary, it is clear that the variable "treatment_type" indicates whether the row corresponds to information about "Pharmaceutical Therapy" or "Radiation therapy". Then, the variable "treatment_or_therapy" contains whether the type of therapy was administered or not.
+
+Lets rearrange the data table down to 495 rows and create 2 columns of treatment occurrence for pharmaceutical and radiation therapy. Lets then go for creating the new dataset!
+
+```{r}
+
+###################
+###################
+clinical_reduced2 = NULL
+cases_unique = unique(clinical_reduced1$case_id)
+
+for (i in 1:length(cases_unique)) {
+  obs_indexes = which(clinical_reduced1[, 1] == cases_unique[i])  
+  index_1 = obs_indexes[1]
+  index_2 = obs_indexes[2]
+  
+  case_info = clinical_reduced1[index_1, -c(35:36)]
+  info_pharmaceutical = NULL
+  info_radiation = NULL
+  if (clinical_reduced1[index_1, 36] == "Pharmaceutical Therapy, NOS") {
+    info_pharmaceutical = clinical_reduced1[index_1, 35]
+    info_radiation = clinical_reduced1[index_2, 35]
+    
+  } else if (clinical_reduced1[index_1, 36] == "Radiation Therapy, NOS") {
+    info_radiation = clinical_reduced1[index_1, 35]
+    info_pharmaceutical = clinical_reduced1[index_2, 35]
+  }
+  
+  case_info$info_radiation = info_radiation
+  case_info$info_pharmaceutical = info_pharmaceutical
+  clinical_reduced2 = rbind(clinical_reduced2, case_info)
+  
+}
+dim(clinical_reduced2)
+
+colnames(clinical_reduced2) = c(colnames(
+  clinical_reduced1[-(35:36)]),
+  "radiation_therapy",
+  "pharmaceutical_therapy")
+rownames(clinical_reduced2) = NULL
+
+rm(case_info, info_radiation, info_pharmaceutical)
+
+table(clinical_reduced2[, 35:36])
+
+```
+
+Let us provide a quick summary of our analysis so far.
+
+\begin{itemize}
+  \item There are 495 true different cases, which are repeated twice in the original clinical dataset, with a total of 990 rows and 213 variables.
+  \item From the 213 variables, there are 177 fully missing variables. Removing these variables gives us a total of 36 variables.
+  \item When comparing the repeated entries for each case, we observe that the only differences are "treatment_or_therapy" and "treatment_type". 
+  \item For each case_id, the repeated rows for that case differ on "treatment_type". Each case has one row with "treatment type" = "Pharmaceutical Therapy, NOS" and another with "treatment type" = "Radiation Therapy, NOS".
+  \item For each type of therapy, we can know whether that treatment was received or not, or if this information was not reported.
+  \item The output dataset eliminates the repetition of the case_id rows, and eliminates the columns "treatment_or_therapy" and "treatment_type". We add the columns "radiation_therapy" and "pharmaceutical_therapy" instead.
+\end{itemize}
+
+
+```{r}
+
+###################
+###################
+write.csv(## Saving in the directory 200.
+  x = clinical_reduced2,
+  file = "212_clinical_reduced.csv")
+
+
+rm(list = ls())
+
+```

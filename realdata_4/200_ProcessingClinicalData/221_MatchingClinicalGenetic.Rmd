@@ -1,0 +1,120 @@
+---
+title: "Matching Genetic and Clinical Data"
+author: "Jose Angel Sanchez Gomez"
+date: '2023-02-20'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+clinical_reduced = read.csv(file = "212_clinical_reduced.csv")
+ProstateGene_clean = read.csv(file = paste0("112_GeneDataClean.csv"))
+
+
+```
+
+## Goals
+
+So far, we have processed the genetic and clinical data. In this code, we will match each clinical row with its corresponding genetic data row, in order to have a single dataset containing both the genetic and clinical data of each patient.
+
+
+First, lets generate an initial visualization of the two separate datasets.
+
+```{r}
+
+head(clinical_reduced)
+head(ProstateGene_clean)
+
+```
+
+From the chunk above, we notice that in the clinical data, patient information is captured by rows, but in the genetic data patients are captured by column. Furthermore, we notice that the format in which each dataset codifies its Case-ID seems to be different. To merge these datasets, we first make both datasets have the same format.
+
+```{r}
+
+p = 200
+n = 551
+X_log = t(ProstateGene_clean[1:p,])
+
+print("Format for genetic data")
+print(rownames(X_log[1:5,]))
+
+print("Format for clinical data")
+clinical_reduced$case_submitter_id[1:5]
+
+```
+
+As we observe from this code chunk, the format of the case_id variable for the clinical and the genetic data has a different format. For this reason, it will be necessary to do some processing of the character labels to have a matching structure.
+
+The following chunk does the proper transformation of the case_id names to have an appropriate match. 
+
+```{r}
+
+case_names_genes = rep("", length(rownames(X_log)))
+
+for(i in 1:length(rownames(X_log))) {
+  substr_id = substr(rownames(X_log)[i], 1, 12)
+  case_names_genes[i] = gsub("\\.", "-", substr_id)
+}
+length(case_names_genes)
+case_names_genes[1:5]
+clinical_reduced$case_submitter_id
+
+```
+
+In order to merge clinical and genetic data, we will do the following. With a for loop, we will find the match of each observation in the genetic dataset to the row corresponding in the clinical dataset. Then, we will create a version of the clinical dataset with the repeated rows corresponding to the order of appearance in the genetic dataset. Finally, we will merge the clinical and the genetic data.
+
+```{r}
+
+case_pos = rep(0, 551)
+count = 0
+for (i in 2:552) {
+  match = which(clinical_reduced$case_submitter_id == case_names_genes[i])
+  if(length(match) != 0) {
+    case_pos[i] = which(clinical_reduced$case_submitter_id == case_names_genes[i])
+  }
+  
+}
+
+clinical_zip = clinical_reduced[case_pos, ]
+
+## Do the names of clinical/gene data order match now?
+clinical_zip$case_submitter_id[1:5]
+case_names_genes[1 + 1:5]
+
+
+```
+
+Awesome! We have succesfully accomplished creating a formated version of the clinical dataset that can be easily zipped with the genetic data consistent with case-ID. Now, we can finally perform the zipping.
+
+
+```{r}
+
+dim(clinical_zip)
+dim(X_log)
+head(X_log[,1:5])
+colnames(X_log) <- X_log[1,]
+X_log <- X_log[-1, ]
+dim(X_log)
+head(X_log[,1:5])
+
+
+genetic_clinical_df = cbind(clinical_zip, X_log)
+dim(X_log)
+dim(clinical_zip)
+dim(genetic_clinical_df)
+
+
+colnames(genetic_clinical_df)
+
+write.csv(## Saving in the 200 folder.
+  x = genetic_clinical_df,
+  file = paste0("222_genetic_clinical_df.csv"))
+write.csv(## Saving in the 300 folder for further analysis.
+  x = genetic_clinical_df,
+  file = paste0(dirname(getwd()),"/300_RealDataAnalysis/222_genetic_clinical_df.csv"))
+#rm(list = ls())
+
+```
+With this, we conclude. We have successfully merged clinical and genetic data into a single dataset, and saved it into a csv file.
