@@ -1,0 +1,333 @@
+---
+title: "Cleaning Data"
+author: "Jose Angel Sanchez Gomez"
+date: "23/3/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(e1071)
+library(nortest)
+library(DescTools)
+
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", 
+               "#009E73", "#F0E442", "#0072B2", 
+               "#D55E00", "#CC79A7")
+
+```
+
+\begin{abstract}
+  In the following document, we read the files corresponding to the gene expression dataset. We create different visualizations of the dataset, and reduce it to a manageable dimension.
+\end{abstract}
+
+## Previously performed analysis:
+
+Let us start by importing the dataset. Due to the size, the data is broken into 6 separate files. Lets start by merging all 6 datasests. As adviced for the use of this dataset, we will use the FPKM-UQ version of the data.
+
+
+```{r echo = FALSE}
+
+ProstateGene <- NULL
+ProstateGene_list <- list()
+
+for (i in 1:6) {
+  ProstateGene_list[[i]] <- read.csv(paste0("01", i, "_Merged_FPKM-UQ.csv"))[, -1]
+  
+  if (i == 1) {
+    ProstateGene <- ProstateGene_list[[1]]
+  } else if(i > 1) {
+    ProstateGene <- cbind(ProstateGene, ProstateGene_list[[i]][, -(1:2)])
+  }
+                                     
+}
+
+dim(ProstateGene)
+head(ProstateGene[, 1:10])
+
+```
+
+```{r echo = FALSE}
+
+
+print(paste("The dataset has", dim(ProstateGene)[1], 
+            "rows and", dim(ProstateGene)[2], "columns." ))
+print("Let us visualize the first corner of the datset.")
+ProstateGene[1:5,1:5]
+
+ngenes = dim(ProstateGene)[1]
+ncases = dim(ProstateGene)[2]-2
+
+
+```
+
+As we can observe, the first two columns do not contain gene expression data, but identificating information for each of the genes that are present in the dataset. Therefore, we have a total of 551 observations, each with 60000 genes.
+
+Now, let us eliminate from the dataset all genes that have variance zero. This can happen due to the fact that all patients had zero expression level for this particular gene. These genes are not informative, and we shoud eliminate them.
+
+```{r  echo=FALSE}
+
+##############################################
+## Eliminate genes that are constant across
+## all observations.
+gene_sd = apply(ProstateGene[,-c(1,2)], MARGIN = 1, sd)
+
+print(paste("There are", sum(gene_sd == 0), "genes with sd = 0."))
+ProstateGene_psd = ProstateGene[ gene_sd > 0, ]
+# print(paste("After eliminating, we have ", dim(ProstateGene_psd)[1]- 2, "genes."))
+
+gene_psd = apply(ProstateGene_psd[,-c(1,2)], MARGIN = 1, sd)
+print(paste("After elimination, there are", sum(gene_psd == 0), "genes with sd = 0."))
+
+
+```
+
+With this, let us now order the genes according to their standard deviation in decreasing order.
+
+```{r  echo=FALSE, fig.height= 9 , fig.width=9}
+
+##############################################
+## Compute the sd of the remaining genes, and
+## give the order.
+ord_gene_psd = order(gene_psd, decreasing = TRUE)
+ngenes_psd = length(gene_psd)
+
+## Display a sample of the density plots of 
+## genes, ordered by s.d.
+par(mfrow = c(4,4),
+    oma = c(0,0,3,0))
+for(plot_ind in 1:16){
+  jump = floor(ngenes_psd/15)
+  index = min((plot_ind-1)*jump+1, ngenes_psd)
+  ord_index = ord_gene_psd[index]
+  x= rep(NA, ncases)
+  for(j in 1:ncases) x[j] = ProstateGene_psd[ord_index,2+j]
+  if(sum(is.na(x)) != 0) print(x)
+  plot(density(x),
+       main = ProstateGene[ord_index,2])
+}
+mtext("Sample of Densities by St.Dev.", outer = TRUE, cex = 2)
+
+rm(plot_ind); rm(jump); 
+rm(index); rm(ord_index); 
+rm(x); rm(j); 
+```
+
+From these plots, we noticeably observe a high level of skewness in the expression of different genes. We also notice that there are several genes that have a high number of repeated zero values. This might indicate that many of these genes are commonly not activated in most patients, and only activate in high numbers for some of the patients.
+
+Let us now generate a similar plot of the data, using the skewness for ordering.
+
+```{r echo = FALSE,  fig.height= 9 , fig.width=9}
+
+##############################################
+## Compute the skewness of every variable, and 
+## order the skewness.
+gene_skewness_psd = apply(ProstateGene_psd[,-c(1,2)], MARGIN = 1, skewness)
+ord_gene_skewness_psd = order(gene_skewness_psd, decreasing = TRUE)
+
+## Display a sample of the density plots of 
+## genes, ordered by s.d.
+par(mfrow = c(4,4),
+    oma = c(0,0,3,0))
+for(plot_ind in 1:16){
+  jump = floor(ngenes_psd/15)
+  index = min((plot_ind-1)*jump +1, ngenes_psd)
+  ord_index = ord_gene_skewness_psd[index]
+  x= rep(NA, ncases)
+  for(j in 1:ncases) x[j] = ProstateGene_psd[ord_index,2+j]
+  plot(density(x),
+       main = ProstateGene_psd[ord_index,2])
+}
+mtext("Sample of Densities by Skewness", outer = TRUE, cex = 2)
+
+rm(plot_ind); rm(jump); 
+rm(index); rm(ord_index); 
+rm(x); rm(j); 
+
+```
+
+There is a considerable number of variables with a high level of skewness. We can also observe that there is a relatively small amount of variables with a small level of skewness. To have a better understanding of this data, let us observe the plot of the skewness.
+
+
+```{r echo = FALSE}
+par(mfrow = c(1,1))
+plot(sort(gene_skewness_psd, decreasing = FALSE),
+     xlab = "index",
+     ylab = "Skewness",
+     main = "Skewness of gene data")
+abline(h = 0)
+abline(h = -1)
+abline(h = 1)
+
+
+```
+
+Notice that the level of skewness present in the data is astonishing, reaching up to 20. As a reference, one would consider a variable to be not skewed if the skewness lies within the range of -1 to 1. Clearly, most variables in this dataset are severely skewed. 
+
+Let us reduce the dataset by selecting the 1000 variables with the highest variance. This will allow us to select the genes that have the most activity in the dataset.
+
+```{r echo = FALSE}
+
+##############################################
+## Select the top p variables with the highest
+## variance, and use those for the analysis.
+p = 1000
+ProstateGene_top = ProstateGene_psd[ord_gene_psd[1:p],]
+ncases = dim(ProstateGene_top)[2]-2
+print(paste("After this elimination, we have", dim(ProstateGene_top)[1],
+            " genes remaining."))
+# View(ProstateGene_top)
+
+
+```
+
+After eliminating these genes, we are interested in looking at the difference between the original plot of skewness and the skewness of the newly selected variables. This is displayed in the following figure.
+
+```{r echo = FALSE}
+
+gene_skewness_top = apply(ProstateGene_top[,-c(1,2)], MARGIN = 1, skewness)
+ord_gene_skewness_top = order(gene_skewness_top, decreasing = TRUE)
+
+par(mfrow = c(1,2),
+    oma = c(0,0,4,0))
+
+plot(sort(gene_skewness_psd, decreasing = FALSE),
+     xlab = "index",
+     ylab = "Skewness",
+     main = "Original")
+abline(h = 0)
+abline(h = -1)
+abline(h = 1)
+plot(sort(gene_skewness_top, decreasing = FALSE),
+     xlab = "index",
+     ylab = "Skewness",
+     main = "Reduced")
+abline(h = 0)
+abline(h = -1)
+abline(h = 1)
+
+mtext("Skewness: before/after reduction", outer = TRUE, cex = 2)
+
+
+
+
+```
+
+Interestingly, the variables selected have a small reduction in the level of skewness, as we can see towards the center. This might be explained by the fact that the genes that have the highest skewness tend to be highly concentrated in zero, with a couple of non-zero values. Therefore, the variance of these genes will solely depend on the magnitude of those values. For other genes with a higher number of non-zero gene expressions, the variance will be more robust to the presence or lack of these extreme points.
+
+To mitigate the effect of the skewness in our dataset, we will apply a standardization technique found in Qing-Hannig-Marron (2016). The idea is to determine, for each gene, the log-transformation that optimally transforms the data to a normal-behaved marginal distribution. This is done by proposing transformations of the form:
+$$x^* = \begin{cases} \log(x - \min(x) +  a) & \text{if } skewness(x) > 1 \\
+                      -\log( \max(x)- x +  a) & \text{if } skewness(x) <  1\end{cases}$$
+
+To select the optimal value of $a$ for this transformation, we simply perform an Anderson-Darling test of normality.
+
+
+```{r echo = FALSE}
+
+##############################################
+## Use the method described in 
+## Qing-Hannig-Marron (2016) to log-transform
+## the data and normalize.
+ProstateGene_clean = NULL
+ADtest = rep(NA,100)
+for(gene in 1:p) {
+  ## Extract the gene-expression values of the 
+  ## gene.
+  x = rep(NA, ncases)
+  for(j in 1:ncases) x[j] = ProstateGene_top[gene,j+2] 
+  R = max(x) - min(x)
+  an = sqrt(2*log(ncases))
+  bn = sqrt(2*log(ncases)-log(log(ncases)) - log(4*pi))
+  p95 = qGumbel(0.95) 
+  L = p95*an + bn
+  sk = skewness(x)
+  
+  betagrid = 10^seq(-log(sqrt(R),base = 10), log(sqrt(R), base = 10),
+                    length.out = 100)
+  ## Perform Anderson-Darling test for each
+  ## log-transform candidate
+  for(candidate in 1:100){
+    # Log transform and center
+    x1 = x
+    if (sk > 0){ x1 = log( x - min(x) + (1/betagrid[candidate])*R )}
+    if(sk <= 0){ x1 = -log( max(x)- x + (1/betagrid[candidate])*R )}
+    x1 = (x1-median(x1))/(MeanAD(x1)*sqrt(pi/2))
+    
+    #windsorize data
+    x1 = sign(x1)*apply(matrix(x1,ncol=1), MARGIN = 1, 
+                        function(s) min(abs(s),L))
+    # Anderson Darling Test
+    adtest = ad.test(x1)
+    ADtest[candidate] = adtest$p.value
+  }
+  opt_candidate = which.max(ADtest)
+  x1 = x
+  if (sk > 0) {x1 = log( x - min(x) + (1/betagrid[opt_candidate])*R )}
+  if (sk <= 0) {x1 = -log( max(x)- x + (1/betagrid[opt_candidate])*R )}
+  x1 = (x1-median(x1))/(MeanAD(x1)*sqrt(pi/2))
+  #windsorize data
+  normalized = sign(x1)*apply(matrix(x1,ncol=1), MARGIN = 1, 
+                              function(x) min(abs(x), L))
+  ProstateGene_clean = rbind(ProstateGene_clean, normalized)
+}
+## We add the names of rows and columns
+rownames(ProstateGene_clean) = ProstateGene_top[,2]
+colnames(ProstateGene_clean) = colnames(ProstateGene_top[-c(1,2)])
+#View(ProstateGene_clean)
+
+rm(x); rm(R); rm(an); rm(bn); rm(p95); rm(L); rm(sk); rm(betagrid)
+rm(candidate); rm(x1); rm(adtest); rm(ADtest); rm(opt_candidate); 
+rm(normalized); rm(gene); rm(j)
+
+
+```
+
+
+After this transformation, it is important to visualize how the skewness was modified before and after the transformation.
+
+```{r echo = FALSE}
+
+
+gene_skewness_clean = apply(ProstateGene_clean[,-c(1,2)], MARGIN = 1, skewness)
+ord_gene_skewness_clean = order(gene_skewness_clean, decreasing = TRUE)
+
+par(mfrow = c(1,2),
+    oma = c(0,0,4,0))
+
+plot(sort(gene_skewness_top, decreasing = FALSE),
+     xlab = "index",
+     ylab = "Skewness",
+     main = "Before")
+abline(h = 0)
+abline(h = -1)
+abline(h = 1)
+plot(sort(gene_skewness_clean, decreasing = FALSE),
+     xlab = "index",
+     ylab = "Skewness",
+     main = "After")
+abline(h = 0)
+abline(h = -1)
+abline(h = 1)
+
+mtext("Skewness: before/after log-transformation", outer = TRUE, cex = 2)
+
+
+```
+
+
+We observe that about 900 variables got properly transformed into the desired range of skewness. Despite this, there is a sizable number of variables that preserve a high level of skewness. Despite this, we can restrict our analysis to focus on this Windsordized data.
+
+For now, the goals of this writeup have been met: we succesfully (1) imported the dataset, (2) created several interesting visualizations of the genes, and particularly understood the skewness presence in the dataset, (3) reduced the number of genes by selecting the genes with the highest variance, and (4) mitigated the skewness by applying log-transformation, with highly successful results.
+
+```{r echo = FALSE}
+
+write.csv(ProstateGene_clean, file = "112_GeneDataClean.csv")## Saving in directory
+write.csv(
+  ProstateGene_clean, ## Saving in directory of next step:
+  file = paste0(dirname(getwd()),"/200_ProcessingClinicalData/112_GeneDataClean.csv"))
+rm(list = ls())
+
+```
