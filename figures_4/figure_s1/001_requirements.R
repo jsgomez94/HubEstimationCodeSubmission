@@ -1,7 +1,14 @@
 
+## Creating local library to save package installations.
 wd <- getwd()
 req_lib <- paste0(wd, "/req_lib")
 
+if (!dir.exists(req_lib)) {
+  dir.create(req_lib)
+}
+
+
+## Package Installation:
 
 if(!require(dplyr, lib = req_lib)){
   .libPaths(req_lib)

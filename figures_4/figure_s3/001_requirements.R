@@ -8,11 +8,14 @@ req_lib <- paste0(wd, "/req_lib")
 if (!dir.exists(subfolder_new)) {
        dir.create(subfolder_new)
 }
+
 if (!dir.exists(paste0(wd, "/100_ScreeningSimulations/outputs1"))) {
   dir.create(paste0(wd, "/100_ScreeningSimulations/outputs1"))
 }
 .libPaths(req_lib)
 
+
+## Package Installation:
 
 if(!require(tidyverse, lib = req_lib)){
   .libPaths(req_lib)

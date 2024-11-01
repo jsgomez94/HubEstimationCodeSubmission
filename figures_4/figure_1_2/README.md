@@ -9,7 +9,8 @@ This folder contains the code to replicate figures 1 and 2 of the main paper.
 
 ## Instructions:
 
-1. To perform the simulations and create plots, run the following line: 
+1. To perform the simulations and create plots, run the following command line: 
 
     - <code>Rscript 005_figures_1n2.R</code>
 
+    Alternatively, open the file <code>005_figures_1n2.R</code> in RStudio with the working directory <code>./figures_4/figure_1_2/</code>, and run the entire script.
