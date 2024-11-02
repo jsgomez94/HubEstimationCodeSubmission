@@ -1,0 +1,221 @@
+---
+title: "Simultaneous Analysis of Confounders"
+author: "Jose Angel Sanchez Gomez"
+date: '2023-03-23'
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+df_reduced <- read.csv("322_df_reduced.csv")[, -1]
+
+```
+
+It is time to do the simultaneous analysis of variable effects. 
+
+
+## Data Preparation.
+
+In order to do the analysis of the simultaneous, we first need to process each of the variables. Which may mean processing the classification variables. Also, eliminate the categories with very low sample sizes.
+
+
+```{r}
+
+summary(df_reduced$race)
+summary(df_reduced$vital_status)
+summary(df_reduced$primary_diagnosis)
+summary(df_reduced$radiation_therapy)
+summary(df_reduced$pharmaceutical_therapy)
+
+```
+
+We do not really need this chunk. You can pass factor variables to a lm()!
+
+```{r}
+
+colnames(df_reduced[, 1:8])
+
+df_dummies <- cbind(
+  model.matrix( ~ race - 1, df_reduced),
+  model.matrix( ~ vital_status - 1, df_reduced),
+  model.matrix( ~ primary_diagnosis - 1, df_reduced),
+  model.matrix( ~ radiation_therapy - 1, df_reduced),
+  model.matrix( ~ pharmaceutical_therapy - 1, df_reduced))
+
+df_reduced_noDiscrete <- df_reduced[, -c(1, 3, 4, 5, 6, 7)]
+colnames(df_reduced_noDiscrete[, 1:8])
+
+df_reduced_dummies <- cbind(df_dummies, df_reduced_noDiscrete)
+colnames(df_reduced_dummies[, 1:20])
+
+rm(df_dummies, df_reduced_noDiscrete, df_reduced_dummies)
+
+```
+
+
+## Analysis 1: controlling for everything but race.
+
+First, we perform the analysis of our genetic data by fitting a linear model $gene ~ vital + diagnosis + radiation + pharmaceutical + age$. Then, instead of analyzing our graphical models on the original gene data, we perform the analysis on the each of the regression residuals. This way, our analysis will eliminate the potential confounding effects that could be present in each of the genes. 
+
+The following chunk creates the data-frame df_residuals, which contains these data.
+
+
+```{r, fig.width= 10, fig.height=10}
+
+# race_inds
+# vital_inds
+# diagnosis
+# radiation
+# pharmaceutical
+# age
+exploring_vars <- c(2:7)
+
+par(mfrow = c(5,5))
+df_residuals <- df_reduced
+df_used <- df_reduced[, exploring_vars]
+for (.var_ind in 7 + 1:200) {
+  print(.var_ind - 7)
+  model <- NULL
+  if (length(exploring_vars) == 0) {
+    model <- lm(df_reduced[, .var_ind] ~  1)
+  } else if (length(exploring_vars) == 1){
+    model <- lm(
+      df_reduced[, .var_ind] ~ df_used)
+  } else {
+    model <- lm(
+      df_reduced[, .var_ind] ~ .,
+      data = df_used)
+  }
+  
+  df_residuals[, .var_ind] <- model$residuals  
+  if ((.var_ind %% 10) == 0) {
+    hist(model$residuals)
+  }
+}
+
+rm("df_used", "exploring_vars", "model")
+
+``` 
+
+Here, we observe some of the gene residual histograms for a subset of 25 different genes in our dataset. As we can observe, most of the genes satsify an approximately normal behavior. Therefore, the use of our method for hub detection is suitable.
+
+In the following chunk, we perform the IPC-HD analysis of the residuals, to determine the presence of hubs in our dataset controlling for the provided confounders:
+
+```{r}
+
+cor_residuals <- cor(df_residuals[, 7 + 1:200])
+
+eig_residuals <- eigen(cor_residuals, symmetric = TRUE)
+
+
+
+par(mfrow = c(1,3))
+plot(1 / eig_residuals$values, main = "Precision Matrix: Eigenvalues")
+plot(eig_residuals$values[200:100 - 1] / eig_residuals$values[200:100], main = "Precision Matrix: Eigenvalue Ratios")
+abline(v = 3, col = "red")
+
+inf_measure <- apply(eig_residuals$vectors[, 198:200]^2, MARGIN = 1, sum)
+plot(inf_measure, main = "Influence Measures")
+abline(h = 2 * 3 / 200)
+colnames(df_reduced[, -(1:7)][, which(inf_measure > 2 * 3 / 200)])
+
+
+```
+
+As we can observe, the hubs obtained through this procedure are exactly the same as the ones that were obtained from the original dataset. Therefore, we can conclude that the estimated hubs are robust when controlling to the 6 confounding variables mentioned before: vital + diagnosis + radiation + pharmaceutical + age. That's really good!
+
+Finally, we will recalculate the GLASSO estimation that was originally considered in our old analysis. It will be of interest to see if the structure of the graphical model will change significantly after the control of these confounding variabies.
+
+First, lets generate a visualization of the log-influence measures obtained by our IPC-HD method:
+
+```{r}
+
+shat_residuals <- 3
+p <- 200
+n <- 551
+
+rbPalweights <- colorRampPalette(c("yellow",
+                                   "orange",
+                                   "red",
+                                   "black"))
+colorweights <- rbPalweights(200)
+par(mfrow = c(1,1),
+    col = "black")
+plot(c(0,0), col = "white",
+     xlim = c(-8, 3),
+     ylim = c(0,200),
+     xlab = "log(Threshold)",
+     ylab = "Variables",
+     main = "Log omega-weights")
+segments(x0 = log(2 * shat_residuals / p, base = 10), y0 = -7, y1 = 207,
+         col = "red")
+#abline(v = log(2*shat_residuals/p, base = 10), col = "red")
+text(x = log(2 * shat_residuals / p, base = 10), y = 200,
+     pos = 4,
+     cex = 0.75,
+     col = "red",
+     labels = "log(2s/p) threshold")
+for (.ell in 1:200) {
+  .w <- infmeas_residuals[.ell]
+  .wlog <- log(.w, base = 10)
+  .wlength <- floor(200 * (.wlog + 8) / 8)
+  .wfloor <- (.wlength * 8 / 200) - 8
+  
+  ## 4nd try:
+  points(x = seq(-8, .wfloor , length.out = .wlength),
+         y = rep(.ell, .wlength),
+         pch = 19, cex = 0.1,
+         col = colorweights[1:.wlength])
+}
+
+.hub <- hubshat_residuals[1]
+.wlog <- log(infmeas_residuals[.hub], base = 10)
+text(x = .wlog + 0.3, y = .hub, pos = 4,
+     labels = colnames(df_residuals)[7 + .hub],
+     cex = 0.70,
+     col = "black")
+.hub <- hubshat_residuals[2]
+.wlog <- log(infmeas_residuals[.hub], base = 10)
+text(x = .wlog + 0.3, y = .hub, pos = 4,
+     labels = colnames(df_residuals)[7 + .hub],
+     cex = 0.70,
+     col = "black")
+.hub <- hubshat_residuals[3]
+.wlog <- log(infmeas_residuals[.hub], base = 10)
+text(x = .wlog + 0.3, y = .hub, pos = 4,
+     labels = colnames(df_residuals)[7 + .hub],
+     cex = 0.70,
+     col = "black")
+.hub <- hubshat_residuals[4]
+.wlog <- log(infmeas_residuals[.hub], base = 10)
+text(x = .wlog + 0.3, y = .hub - 1, pos = 4,
+     labels = colnames(df_residuals)[7 + .hub],
+     cex = 0.70,
+     col = "black")
+.hub <- hubshat_residuals[5]
+.wlog <- log(infmeas_residuals[.hub], base = 10)
+text(x = .wlog + 0.3, y = .hub + 1, pos = 4,
+     labels = colnames(df_residuals)[7 + .hub],
+     cex = 0.70,
+     col = "black")
+
+
+
+```  
+
+
+Done!
+
+
+```{r}
+
+print(ls())
+
+write.csv(x = df_residuals, file = "332_df_residuals.csv")
+rm(list = ls())
+       
+
+```

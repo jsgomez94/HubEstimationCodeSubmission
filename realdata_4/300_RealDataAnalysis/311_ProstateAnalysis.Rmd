@@ -1,0 +1,195 @@
+---
+title: "Analysis of confounders on Hub Detection"
+author: "Jose Angel Sanchez Gomez"
+date: '2023-03-23'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source("src/log_transform.R")
+source("src/plotting.R")
+
+```
+
+
+The dataset we will analyze here was generated in the folder \texttt{"/realdata_4/200_ProcessingClinicalData/221_MatchingClinicalGenetic.Rmd"}. Thanks to the merging of our clinical and genetic data, we can now control the effect of clinical variables in our analysis of hubs in graphical models.
+
+We start by importing the dataset \texttt{222_genetic_clinical_df.csv}. Then, we eliminate any redundant variables such as counts, observation id's and other variables of this nature. We keep the case_submitter_id to keep track of the potential overlaps in our data.
+
+```{r}
+
+df_full <- read.csv("222_genetic_clinical_df.csv", header = TRUE)
+dim(df_full)
+
+head(df_full[1:50])
+
+df_full <- df_full[, -c(1,2,3,5)]
+head(df_full[1:50])
+
+```
+
+
+We will perform our analysis by eliminating the effect of potential variables such as race, age or clinical treatment as part of our analysis. In order to do this, we will first explore the missing data problem.
+
+```{r, fig.width=8}
+
+colnames(df_full[, 1:40])
+df_clinical <- df_full[, 1:34]
+
+## BEFORE VARIABLE ELIMINATION!
+colwise_missing <- apply(
+  df_clinical, MARGIN = 2,
+  function(x) sum(x == "'--"))
+
+var_cols <- rep("black", dim(df_clinical)[1])
+vars_wmissing <- (colwise_missing > 0)
+var_cols[vars_wmissing] <- "red"
+
+par(mfrow = c(1,2))
+plot(
+  colwise_missing,
+  ylim = c(0, dim(df_clinical)[1]), 
+  xlab = "Variable Index", ylab = "Number of missing entries",
+  main = "Missing data per variable: BEFORE",
+  col = var_cols)
+abline(h = 0)
+
+colnames(df_clinical)[vars_wmissing]
+
+df_clinical_reduced <- df_clinical[, !vars_wmissing]
+
+
+## AFTER VARIABLE ELIMINATION!
+colwise_missing <- apply(
+  df_clinical_reduced, MARGIN = 2,
+  function(x) sum(x == "'--"))
+
+var_cols <- rep("black", dim(df_clinical_reduced)[1])
+vars_wmissing <- (colwise_missing > 0)
+var_cols[vars_wmissing] <- "red"
+plot(
+  colwise_missing,
+  ylim = c(0, dim(df_clinical_reduced)[1]), 
+  xlab = "Variable Index", ylab = "Number of missing entries",
+  main = "Missing data per variable: AFTER",
+  col = var_cols)
+abline(h = 0)
+
+```
+
+As we can observe, there are a total of 12 variables that have missing observations. We eliminate all these variables, since none of them are really essential. The variables with missing values are:
+
+"days_to_birth"          "days_to_death"          "year_of_birth"          "year_of_death"          "age_at_diagnosis"      
+"ajcc_clinical_m"        "ajcc_clinical_t"        "ajcc_pathologic_n"      "ajcc_pathologic_t"      "days_to_diagnosis"     
+"days_to_last_follow_up" "year_of_diagnosis"
+
+Another type of information we can filter with is whether the information was reported or not. We will consider whether to eliminate any variable for which the entry "not reported" is present.
+
+```{r}
+
+colwise_missing <- apply(
+  df_clinical_reduced, MARGIN = 2,
+  function(x) sum(x %in% c("not reported", "Not Reported")))
+
+var_cols <- rep("black", dim(df_clinical_reduced)[1])
+vars_wmissing <- (colwise_missing > 0)
+var_cols[vars_wmissing] <- "red"
+plot(
+  colwise_missing,
+  ylim = c(0, dim(df_clinical_reduced)[1]), 
+  xlab = "Variable Index", ylab = "Number of missing entries",
+  main = "Number of missing data per variable",
+  col = var_cols)
+abline(h = dim(df_clinical_reduced)[1])
+
+print(
+  cbind(
+    (1:dim(df_clinical_reduced)[2])[vars_wmissing],
+    colnames(df_clinical_reduced)[vars_wmissing], colwise_missing[vars_wmissing]))
+
+# View(df_clinical_reduced)
+``` 
+
+Lets eliminate from this data the variables that have more than 100 missing observation. This way, we can consider variables removing some of the observations from the dataset. Also, \texttt{tumor_grade} and \texttt{synchronous_malignancy}
+
+```{r}
+
+notreported_vars <- c(3, 7, 9, 15, 18, 20)
+df_clinical_reduced2 <- df_clinical_reduced[, -notreported_vars]
+
+
+## AFTER VARIABLE ELIMINATION!
+colwise_missing <- apply(
+  df_clinical_reduced2, MARGIN = 2,
+  function(x) sum(x == "not reported"))
+
+var_cols <- rep("black", dim(df_clinical_reduced2)[1])
+vars_wmissing <- (colwise_missing > 0)
+var_cols[vars_wmissing] <- "red"
+plot(
+  colwise_missing,
+  ylim = c(0, dim(df_clinical_reduced2)[1]), 
+  xlab = "Variable Index", ylab = "Number of missing entries",
+  main = "Number of missing data per variable: AFTER",
+  col = var_cols)
+abline(h = 0)
+
+```
+
+
+Great! Lets now look at the names of the variables in the dataset, and potentially eliminate the variables that are not useful.
+
+From the results obtained in the next chunk, I have decided to eliminate the variables:
+
+"gender", "icd_10_code", "morphology", ""primary_gleason_grade", prior_treatment", "secondary_gleason_grade", "site_of_resection_or_biopsy", "tissue_or_organ_of_origin"
+
+```{r}
+
+# colnames(df_clinical_reduced2)
+# View(df_clinical_reduced2)
+
+vars_unnecessary <- c(3, 6, 7, 9, 10, 11, 12, 13, 14)
+df_clinical_reduced3 <- df_clinical_reduced2[, -vars_unnecessary]
+
+colnames(df_clinical_reduced3)
+
+```
+
+
+I will see what happens when analyzing the data taking into account the variables that we have left!
+
+Now, we can reduce the set of variables!
+
+
+
+```{r}
+
+good_clinical_vars <- ((colnames(df_full) %in% colnames(df_clinical_reduced3)) | (1:234) > 34)
+
+df_reduced <- df_full[, good_clinical_vars]
+
+colnames(df_reduced)
+
+``` 
+
+Excelent! Everything looks good. Lets just save the progress.
+
+```{r}
+
+#write.csv(x = df_reduced, file = "genetic_clinical_reduced_df.csv")
+
+rm(
+  "cbPalette", "colwise_missing", "df_clinical", "df_clinical_reduced", "df_clinical_reduced2",
+  "df_clinical_reduced3", "good_clinical_vars", "left_log_transform", "notreported_vars", "plot.mardist",
+  "plot.multiclass_density", "plot.pdm", "right_log_transform", "var_cols", "vars_unnecessary",
+  "vars_wmissing", "wrap_sentence"    
+)
+
+print(ls())
+
+write.csv(df_reduced, file = "312_df_reduced.csv")
+rm(list = ls())
+       
+
+```

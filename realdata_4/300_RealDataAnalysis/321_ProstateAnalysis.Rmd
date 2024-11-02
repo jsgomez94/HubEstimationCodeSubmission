@@ -1,0 +1,75 @@
+---
+title: "Original Analysis on Hub Detection"
+author: "Jose Angel Sanchez Gomez"
+date: '2023-03-23'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+df_reduced <- read.csv("312_df_reduced.csv")
+head(df_reduced[, 1:5])
+```
+
+
+
+
+## Original Analysis
+
+To observe what are the results when controlling for underlying clinical variables, lets first re-visualize the results without controlling for these variables.
+
+```{r, fig.width = 10, fig.height = 5}
+
+df_reduced <- df_reduced[, -1]
+df_genes <- df_reduced[, 7 + 1:200]
+cor <- cor(df_genes)
+
+eig <- eigen(cor)
+
+par(mfrow = c(1,3))
+plot(1 / eig$values, main = "Precision Matrix: Eigenvalues")
+plot(eig$values[200:100 - 1] / eig$values[200:100], main = "Precision Matrix: Eigenvalue Ratios")
+abline(v = 3, col = "red")
+
+inf_measure <- apply(eig$vectors[, 198:200]^2, MARGIN = 1, sum)
+plot(inf_measure, main = "Influence Measures")
+abline(h = 2 * 3 / 200)
+colnames(df_genes[, which(inf_measure > 2 * 3 / 200)])
+
+
+rm("df_genes", "cor", "eig", "inf_measure")
+
+```
+
+As we can observe in our original results, without controlling for underlying clinical variables, we obtain 3 separating eigenvalues, and 5 hub variables: "SEMG1",   "RN7SK",   "SEMG2",   "MIR3609" and "SCARNA7". 
+
+
+
+## Preliminary steps
+
+Before jumping into our analysis, we will first ensure that our variables of interest are clean and ready to use.
+
+
+```{r}
+
+colnames(df_reduced[, 1:7])
+
+df_reduced$race <- as.factor(df_reduced$race)
+df_reduced$vital_status <- as.factor(df_reduced$vital_status)
+df_reduced$primary_diagnosis <- as.factor(df_reduced$primary_diagnosis)
+df_reduced$radiation_therapy <- as.factor(df_reduced$radiation_therapy)
+df_reduced$pharmaceutical_therapy <- as.factor(df_reduced$pharmaceutical_therapy)
+
+```
+
+
+With this processing, lets save the results, and in the next Rmd, we do the analysis of hub detection when regressing our data against these 6 clinical variables of interest.
+
+```{r}
+
+print(ls())
+write.csv(df_reduced, file = "322_df_reduced.csv")
+rm(list = ls())
+
+```
