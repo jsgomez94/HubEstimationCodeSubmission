@@ -89,6 +89,10 @@ The rest of the code can run by loading the following!
 
 ```{r}
 
+source("src/wglasso_functions.R")
+source("src/plotting.R")
+library(igraph)
+
 load("ProstateAnalysis4_1_Data.RData")
 
 ```
@@ -134,7 +138,7 @@ For visualization purposes, we generate the network plots by discarding the bott
 ##############################################
 ## Generate a first network.
 pmhat_residuals <- (output_wgl_residuals$optimal.model)$wi ## Original PM
-pmadj_residuals <- adj(pmhat_residuals, threshold = 10^(0))## Adjacency of PM
+pmadj_residuals <- (abs(pmhat_residuals) >= 10^(0))## Adjacency of PM
 pmadj_residuals <- pmadj_residuals - diag(diag(pmadj_residuals)) ## diagonal zero.
 
 # 2) Create network object and set parameters.
