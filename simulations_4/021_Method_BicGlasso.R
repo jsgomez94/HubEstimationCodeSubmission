@@ -19,8 +19,7 @@ original <- TRUE
 ##                    absolute entries over threshold.
 ##
 ##  OUTPUTS: 
-##      ridge_eig : numeric vector. Shifted eigenvalues
-##                   of the matrix.
+##      .bic : value of the BIC.
 ##
 .BICemp <- function(mat, inv_est, p, n, threshold = 0){
   ## After symmetrization, there is a legitimate minimizer. Consider this...
