@@ -1,0 +1,175 @@
+---
+title: "Recreating Figures"
+author: "Jose Angel Sanchez Gomez"
+date: '2023-03-25'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+source("src/plotting.R")
+
+load("343_ProstateAnalysis4_2_Data.RData")
+
+```
+
+
+## FIGURE 5 OF MAIN PAPER
+
+```{r, fig.width = 8, fig.height = 5}
+
+library(pBrackets)
+
+par(mfrow = c(1,2),
+    #oma = c(1,1,1,1),
+    mar = c(5,5,5,3),
+    col = "black",
+    cex.main = 1.5)
+shat_residuals <- 3
+eig_inv_residuals <- 1 / eig_residuals$values[200:150]
+plot(
+  eig_inv_residuals,
+  pch = 19,
+  ylab = "Eigenvalues", xlab = "Eigenvalue index",
+  main = "Inverse Correlation Eigenvalues")
+brackets(x1 = 5, y1 = eig_inv_residuals[3], 
+         x2 = 5, y2 = eig_inv_residuals[4],
+         h = 3,  ticks = 0.5, 
+         curvature = 0.5, type = 1,
+         col = "red", lwd = 1, lty = 1, xpd = FALSE)
+text(label = "Max ratio gap: 3",
+     x = 10, y = (eig_inv_residuals[3] + eig_inv_residuals[4])/2,
+     col = "red", pos = 4)
+abline(h = 0, col = "grey")
+
+
+eig_inv_ratios <- eig_inv_residuals[1:50] / eig_inv_residuals[1:50 + 1]
+plot(
+  eig_inv_ratios, pch = 19,
+  xlab = "Ratio", ylab = "Index", main = "Eigenvalue Ratios")
+abline(v = 3, col = "red")
+text(
+  label = "Max ratio gap: 3", x = 5, 
+  y =  0.55 * max(eig_inv_ratios),
+  col = "red", pos = 4)
+points(
+  x = shat_residuals,
+  y = eig_residuals$values[198 - 1] / eig_residuals$values[198],
+  pch = 19, col = "black")
+
+infmeas_residuals <- apply(eig_residuals$vectors[, 198:200]^2, MARGIN = 1, sum)
+
+``` 
+
+
+
+## FIGURE 6 OF MAIN PAPER
+
+```{r, fig.height= 6, fig.width=10}
+
+shat <- 3
+
+par(mfrow = c(1,2),
+    oma = c(1,1,2,1),
+    mar = c(2,1,2,2),
+    col = "black",
+     cex.main = 1.5)
+
+rbPalweights <- colorRampPalette(c("yellow",
+                                   "orange",
+                                   "red",
+                                   "black"))
+colorweights <- rbPalweights(200)
+
+################################################################
+## AESTHETIC INFLUENCE MEASURE PLOT, HIGHLIGHTING HUB VARIABLES
+
+## create empty plot
+plot(c(0,0), col = "white",
+     xlim = c(-7.75, 3),
+     ylim = c(0,200),
+     xlab = "log(Threshold)",
+     ylab = "Variables",
+     yaxt = "n",
+     main = "Log-Influence Measure")
+segments(x0 = log(2*shat/p, base = 10), y0 = -7, y1 = 207,
+         col = "red")
+text(x = log(2*shat/p, base = 10), y = 195,
+     pos = 4,
+     cex = 1,
+     col = "red",
+     labels = "log(2s/p) \n threshold")
+## Add gradient bars per variable
+for(.ell in 1:200){
+  .w = infmeas_residuals[.ell]
+  .wlog = log(.w, base = 10)
+  .wlength = floor(200 * (.wlog + 8) / 8)
+  .wfloor =  (.wlength * 8 / 200) - 8
+  
+  ## 4nd try:
+  points(x = seq(-8, .wfloor , length.out = .wlength),
+         y = rep(.ell, .wlength),
+         pch = 19, cex = 0.1,
+         col = colorweights[1:.wlength])
+}
+
+## Add the name of the hubs individually:
+.hub <- hubshat_residuals[1]
+.wlog <- log(infmeas_residuals[.hub], base = 10)
+text(x = .wlog + 0.3, y = .hub - 2, pos = 4,
+     labels = colnames(df_residuals)[7 + .hub],
+     cex = 1,
+     col = "black")
+.hub <- hubshat_residuals[2]
+.wlog <- log(infmeas_residuals[.hub], base = 10)
+text(x = .wlog + 0.3, y = .hub, pos = 4,
+     labels = colnames(df_residuals)[7 + .hub],
+     cex = 1,
+     col = "black")
+.hub <- hubshat_residuals[3]
+.wlog <- log(infmeas_residuals[.hub], base = 10)
+text(x = .wlog + 0.3, y = .hub + 2, pos = 4,
+     labels = colnames(df_residuals)[7 + .hub],
+     cex = 1,
+     col = "black")
+.hub <- hubshat_residuals[4]
+.wlog <- log(infmeas_residuals[.hub], base = 10)
+text(x = .wlog + 0.3, y = .hub - 1, pos = 4,
+     labels = colnames(df_residuals)[7 + .hub],
+     cex = 1,
+     col = "black")
+.hub <- hubshat_residuals[5]
+.wlog <- log(infmeas_residuals[.hub], base = 10)
+text(x = .wlog + 0.3, y = .hub + 1, pos = 4,
+     labels = colnames(df_residuals)[7 + .hub],
+     cex = 1,
+     col = "black")
+
+
+################################################################
+
+
+plot(net3, layout = lw3,
+     main = "Weighted GLASSO Visualization",
+     margin = c(0.1, 0.1, 0.1, 0.1),
+     xlim = c(-0.8, 1.75),
+     #ylim = c(-12, 21),
+     frame = TRUE)
+legend("topright", inset = .05, title = "Nodes:",
+       c("Hub gene Gr1", "Hub gene Gr2", "Non-hub gene"),
+       fill = c("red", "purple3", "darkgoldenrod1"),
+       horiz = FALSE,
+       cex = 0.75)
+legend("bottomright", inset = .05, title = "Edges:",
+       legend = c("Strong edge Gr1",
+                  "Strong edge Gr2",
+                  "Weak edge"),
+       col = c("red", "purple3", "grey"),
+       lty = c(1, 1),
+       lwd = c(3, 3, 2),
+       cex = 0.75)
+
+```
+

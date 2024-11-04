@@ -1,0 +1,385 @@
+---
+title: "Weighted GLASSO on Residuals"
+author: "Jose Angel Sanchez Gomez"
+date: '2023-03-24'
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+source("src/wglasso_functions.R")
+source("src/plotting.R")
+
+df_reduced    <- read.csv("322_df_reduced.csv")[, -1]
+df_residuals  <- read.csv("332_df_residuals.csv")[, -1]
+
+```
+
+To conclude our analysis, we rerun the Hub-weighted GLASSO method with our residuals, and compare the hub detection results with those obtained by our IPC-HD method.
+
+
+```{r}
+
+cor_residuals <- cor(df_residuals[, 7 + 1:200])
+
+eig_residuals <- eigen(cor_residuals, symmetric = TRUE)
+
+
+par(mfrow = c(1,3))
+plot(1 / eig_residuals$values, main = "Precision Matrix: Eigenvalues")
+plot(eig_residuals$values[200:100 - 1] / eig_residuals$values[200:100], main = "Precision Matrix: Eigenvalue Ratios")
+abline(v = 3, col = "red")
+
+inf_measure <- apply(eig_residuals$vectors[, 198:200]^2, MARGIN = 1, sum)
+plot(inf_measure, main = "Influence Measures")
+abline(h = 2 * 3 / 200)
+colnames(df_reduced[, -(1:7)][, which(inf_measure > 2 * 3 / 200)])
+
+colnames(df_residuals[, 7 + which(inf_measure > 2 * 3 / 200)])
+hubshat_residuals <- which(inf_measure > 2 * 3 / 200)
+
+
+```
+
+## Step 0: do the calculations of the graphical model.
+
+```{r}
+
+rholist <- 10^(seq(-5, 0, length.out = 10))
+
+cor_residuals <- cor(df_residuals[, 7 + 1:200])
+p = 200
+n = 551
+
+output_wgl_residuals <- wglassoBIC(
+  cov = cor_residuals,
+  rho = rholist,
+  hub = hubshat_residuals,
+  p = p,
+  n = n)
+## Visualizing BIC and the precision matrix:
+par(mfrow = c(1, 2))
+plot(output_wgl_residuals$BIC)
+plot.pdm(data = (output_wgl_residuals$optimal.model)$wi,
+         main = "Output Weighted HGLASSO",
+         breaks = 20, diagonal = FALSE, cex = 0.5)
+
+```
+
+
+Since fitting the WGL model is so time consuming, we save the output of this model in an RData file. We can then retrieve it so it is not necessary to rerun the fitting of the model again.
+
+```{r}
+
+rm(
+  cv.wglasso, cv.wglassoBIC, plot.mardist, plot.multiclass_density, plot.pdm,
+  robust.adj, wglasso, wglassoBIC, wrap_sentence,
+  cbPalette)
+
+print(ls())
+
+save.image(file = "ProstateAnalysis4_1_Data.RData")
+       
+
+```
+
+The rest of the code can run by loading the following!
+
+```{r}
+
+load("ProstateAnalysis4_1_Data.RData")
+
+```
+
+
+## Step 1: Create the first network visualization.
+
+Lets first explore the sparsity level, as well as the entry sizes for the estimated precision matrix by the WGL method. To best visualize the matrix magnitudes, we visualize them with a plot in logaritmic scale. Since many entries 
+
+```{r}
+
+pm_est <-  output_wgl_residuals$optimal.model$wi
+p <- ncol(pm_est) 
+
+print(paste0(
+  "The total number of non-zero entries in the WGL estimator: ",
+  sum(pm_est != 0)))
+
+print(paste0(
+  "Percentage of non-zero entries: ",
+  sum(pm_est != 0) / (p * p)))
+
+entries <- pm_est[upper.tri(pm_est, diag = FALSE)]
+
+par(mfrow = c(1,1))
+plot(abs(entries[entries != 0]), log="y",
+     main = "PM Non-zero absolute \n Entry Magnitude",
+     ylab = "Abs. Entry (log-scale)")
+abline(h = 1, col = "red")
+
+print(paste0(
+  "Percentage of non-zero entries with absolute values > 1: ",
+  sum(abs(entries) > 1) / sum(abs(entries) > 0)))
+
+
+```
+As we can observe, despite of having a relatively sparse graph, there are too many connections in the graphical model for comfortable network visualizations to be created. Despite this, the distribution on the size of entries is highly skewed, with only a few entries having values above 1. In fact, as calculated, exactly 5\% of entries in the precision matrix have values above 1.
+
+For visualization purposes, we generate the network plots by discarding the bottom 95\% of the entries, and we display the 5\% of largest non-diagonal entries in the precision matrix. To identify hubs from non-hubs, we color hubs with red.
+
+```{r}
+
+##############################################
+## Generate a first network.
+pmhat_residuals <- (output_wgl_residuals$optimal.model)$wi ## Original PM
+pmadj_residuals <- adj(pmhat_residuals, threshold = 10^(0))## Adjacency of PM
+pmadj_residuals <- pmadj_residuals - diag(diag(pmadj_residuals)) ## diagonal zero.
+
+# 2) Create network object and set parameters.
+net <- graph_from_adjacency_matrix(pmadj_residuals)
+deg <- degree(net, mode = "all")
+nedges <- length(E(net))
+V(net)$color <- rep("orange", 200)
+V(net)$color[hubshat_residuals] <- rep("red", 5)
+V(net)$size <- 5
+V(net)$label <- ""
+V(net)$frame.color <- "white"
+E(net)$arrow.mode <- 0
+lw <- layout_with_fr(net)
+plot(net, layout = lw)
+
+```
+
+As we can observe, the 5 hubs detected by our IPC-HD method are separated into 2 groups. The first group corresponds to the genes RN7SK, MIR3609, and  SCARNA7, which are the center of a community of nodes. On the other hand, we have the genes SEMG1 and SEMG2, which do not have a community, but have a strong connection between them. 
+
+
+```{r}
+
+
+neigh1 <- neighbors(graph = net, v = hubshat_residuals[1], mode = "total")
+neigh3 <- neighbors(graph = net, v = hubshat_residuals[3], mode = "total")
+
+hubshat_comm2_residuals <- unique(c(neigh1, neigh3))
+
+
+neigh2 <- neighbors(graph = net, v = hubshat_residuals[2], mode = "total")
+neigh4 <- neighbors(graph = net, v = hubshat_residuals[4], mode = "total")
+neigh5 <- neighbors(graph = net, v = hubshat_residuals[5], mode = "total")
+
+hubshat_comm3_residuals <- unique(c(neigh2, neigh4, neigh5))
+
+par(mfrow = c(1,2))
+plot(
+  apply(pmadj_residuals, MARGIN = 2, sum),
+  main = "WGL: L0 Discrete Degree",
+  xlab = "Variable index",
+  ylab = "L0 Degree")
+abline(v = hubshat_residuals)
+plot(
+  apply(abs(pmhat_residuals - diag(diag(pmhat_residuals))), MARGIN = 2, sum),
+  main = "WGL: L1 Continuous Degree",
+  xlab = "Variable index",
+  ylab = "L1 Degree")
+abline(v = hubshat_residuals)
+
+rm(neigh1, neigh2, neigh3, neigh4, neigh5)
+
+```
+
+As we can observe, the hub genes RN7SK, MIR3609, and  SCARNA7 have both high L0 and L1 degrees. On the other hand, SEMG1 and SEMG2 have high L1 degree, but a low L0 degree. This indicates that the hub genes SEMG1 and SEMG2 are hubs, not because of a large number of connections, but because of having very strong connections.
+
+
+While the visualizations we have generated is informative, we would like to generate a better visualization for the paper. With this goal in mind, we create a new igraph object, adding the hub-associated edges as the first elements in the edge list of the network. This will help generate nicer visualizations.
+
+
+
+## Step 2: Create the second network visualization.
+
+To create a new figure where we highlight edges with strong connectivity in the network plot, we first create a new network object where we remove the edges in the PM with absolute values above 100. In this chunk, we extract the edges with these large magnitudes, and save them in the object \texttt{strong.edgelist}:
+
+```{r}
+
+par(mfrow = c(1, 1))
+## Bring the strong connections to the
+## front of the estimation.
+nedges <- length(E(net))
+edgemat <- ends(graph = net, es = 1:nedges)
+strong.edge <- c()
+count <- 1
+
+abs_edges <- apply(
+  edgemat, MARGIN = 1,
+  function(x) abs(pmhat_residuals[x[1], x[2]]))
+  
+strong.edge <- which(abs_edges > 100)
+
+strong.edgelist <- E(net)[strong.edge]
+
+net2 <- delete_edges(graph = net, edges = strong.edgelist)
+length(E(net2))
+
+strong.edgelist
+```
+
+## Step 3: Create the third network visualization.
+
+
+
+```{r}
+
+## We add the edges with strong connectivities at the end of the edgelist.
+net3 = add_edges(graph = net2, edges = c(1, 12, 12, 1,
+                                         6, 151, 151, 6,
+                                         6, 174, 174, 6,
+                                         151, 174, 174, 151))
+E(net3)[-(1:500)] 
+
+V(net3)$color <- rep("darkgoldenrod1", 200)
+E(net3)$color <- rep("gray60", 536)
+E(net3)$width <- rep(1, 536)
+
+V(net3)$color[hubshat_comm3_residuals] <- "orchid4"
+V(net3)$color[hubshat_comm2_residuals] <- "firebrick3"
+
+V(net3)$color[hubshat_residuals] <- c("darkred", "purple4", "darkred", 
+                            "purple4", "purple4")
+
+V(net3)$size <- 4
+V(net3)$size[hubshat_residuals] <- 5
+V(net3)$frame.color <- "white"
+E(net3)$arrow.mode <- 0
+V(net3)$label <- ""
+
+
+## Emphasizing large connections in network with colors:
+E(net3)$color[529] <- "red"
+E(net3)$color[530] <- "red"
+E(net3)$color[531] <- "purple3"
+E(net3)$color[532] <- "purple3"
+E(net3)$color[533] <- "purple3"
+E(net3)$color[534] <- "purple3"
+E(net3)$color[535] <- "purple3"
+E(net3)$color[536] <- "purple3"
+E(net3)$width[529] <- 3
+E(net3)$width[530] <- 3
+E(net3)$width[531] <- 3
+E(net3)$width[532] <- 3
+E(net3)$width[533] <- 3
+E(net3)$width[534] <- 3
+E(net3)$width[535] <- 3
+E(net3)$width[536] <- 3
+
+
+``` 
+
+Now, we generate the plot.
+
+```{r}
+
+# 3) Plot:
+par(mfrow = c(1, 1),
+    oma = c(0, 0, 0, 0),
+    mar = c(1, 2, 3, 2))
+
+lw2 <- lw
+
+plot(net3, layout = lw2,
+     main = "Weighted GLASSO visualization",
+     margin = c(0.1, 0.1, 0.1, 0.1),
+     frame = TRUE) 
+legend("topright", inset = .05, title = "Nodes:",
+       c("Hub gene 1", "Community 1", "Hub gene 2", "Community 2", "Non-hub gene"),
+       fill = c("darkred", "firebrick3", "purple4", "orchid4", "darkgoldenrod1"),
+       horiz = FALSE,
+       cex = 0.75)
+legend("bottomright", inset=.05, title = "Edges:",
+       legend = c("Strong edge Gr1",
+                  "Strong edge Gr2",
+                  "Weak edge"),
+       col = c("red", "purple4", "grey"), 
+       lty = c(1, 1),
+       lwd = c(3, 3, 2),
+       cex = 0.75)
+
+
+``` 
+
+I do not know what this is for:
+
+```{r}
+
+##############################################
+lw3 = lw2
+
+par(mfrow = c(1, 1),
+    oma = c(1, 1, 2, 1),
+    mar = c(2, 1, 2, 2), col = "black")
+plot(net3, layout = lw3,
+     main = "Weighted GLASSO Visualization",
+     margin = c(0.1, 0.1, 0.1, 0.1),
+     xlim = c(-0.8, 1.75),
+     #ylim = c(-12, 21),
+     frame = TRUE)
+legend("topright", inset = .05, title = "Nodes:",
+       c("Hub gene Gr1", "Hub gene Gr2", "Non-hub gene"), 
+       fill = c("red", "purple3", "darkgoldenrod1"),
+       horiz = FALSE,
+       cex = 0.75)
+legend("bottomright", inset = .05, title = "Edges:",
+       legend = c("Strong edge Gr1", "Strong edge Gr2", "Weak edge"),
+       col = c("red", "purple3","grey"), 
+       lty = c(1, 1),
+       lwd = c(3, 3, 2),
+       cex = 0.75)
+
+```
+
+
+
+
+
+
+
+
+
+## Lets Run the UpToDatePlot.R
+
+```{r}
+
+plot(net3, layout = lw3,
+     main = "Weighted GLASSO Visualization",
+     margin = c(0.1, 0.1, 0.1, 0.1),
+     xlim = c(-0.8, 1.75),
+     #ylim = c(-12, 21),
+     frame = TRUE)
+legend("topright", inset = .05, title = "Nodes:",
+       c("Hub gene Gr1", "Hub gene Gr2", "Non-hub gene"),
+       fill = c("red", "purple3", "darkgoldenrod1"),
+       horiz = FALSE,
+       cex = 0.75)
+legend("bottomright", inset = .05, title = "Edges:",
+       legend = c("Strong edge Gr1",
+                  "Strong edge Gr2",
+                  "Weak edge"),
+       col = c("red", "purple3", "grey"),
+       lty = c(1, 1),
+       lwd = c(3, 3, 2),
+       cex = 0.75)
+
+```
+
+
+```{r}
+
+
+save.image(file = "343_ProstateAnalysis4_2_Data.RData")
+rm(list = ls())
+
+```
+
+
+
+
+
